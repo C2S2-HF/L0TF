@@ -13,3 +13,5 @@ Last update: 2022-07-11
 #### __figs__ folder contains all the figures we generate by running the R code in the __code__ folder.
 
 #### __Rda__ folder contains the output RData by runing the R code in the __code__ folder.
+
+#### __data__ folder contains the data in the real data application in Section 4.3.
