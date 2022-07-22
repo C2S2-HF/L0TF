@@ -18,3 +18,7 @@ Last update: 2022-07-11
 #### __Rda__ folder contains the output RData by runing the R code in the __code__ folder.
 
 #### __data__ folder contains the data in the real data application in Section 4.3.
+
+#### AMIAS_1.0.3.tar.gz contains the source file for implementing the algorithm. After downloading it, you need to run the following code in R to install it.
+
+install.packages("Your_download_path/AMIAS_1.0.3.tar.gz", repos = NULL)
