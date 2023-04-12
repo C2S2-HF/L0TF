@@ -46,8 +46,8 @@ The goal of this repository is to share softare and R scripts of our paper *$\el
 * RealData.R: replicate the results and generate all the graphs in Section 4.3.
 * AlgoAnalysis_APP.Rmd: replicate the reuslts and generate Figures B.1-B.7 in Appendix B.1.
 * __simu__ folder contains R scripts used in Appendix B.2: 
-    * replicate the results in Appendix B.2 except for the l0-MIP.
-    * nsimul0tfc.R and tsimul0tfc.R: replicate the results of the l0-MIP method in Appendix B.2.
+    * nsimu.R and tsimu.R: replicate the results for all methods except for the l0-MIP with large sample size.
+    * nsimul0tfc.R and tsimul0tfc.R: replicate the results of the l0-MIP method when sample size is large.
 * __simu_plots__ folder contains the R Scripts used to generate Figures B.9-B.20 in Appendix B.2.
     * post_plot.R: generate Figures B.9, B.11 and B.13. 
     * pre_plot.R: generate Figures B.10, B.12 and B.14.
