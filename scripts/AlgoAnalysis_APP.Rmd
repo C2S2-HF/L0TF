@@ -1,0 +1,557 @@
+---
+title: "Numerical Experiments for the Naive AMIAS Algorithm"
+date: "2023-04-10"
+output:
+  html_document:
+    highlight: tango
+    mathjax: null
+    number_sections: yes
+    theme: paper
+    toc: yes
+    toc_depth: 2
+editor_options: 
+  chunk_output_type: console
+---
+<style>
+  body {font-size: 14pt; }
+</style>
+
+```{r setup, include=FALSE}
+options(width=120)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, message=FALSE)
+```
+
+This file replicates the numerical experiments in Appendix B.1 of the following paper: 
+
+**$\ell_0$ Trend Filtering ** by Canhong Wen, Xueqin Wang, Aijun Zhang.
+
+
+# Load Packages and Functions Needed
+
+```{r}
+library(AMIAS)
+library("gridExtra")
+library(ggpubr)
+# -----------------------------------
+# Toy Example: Piecewise Constant/Linear Simulation 
+# -----------------------------------
+ToyEx <- function(n, sigma=0.1, q=0, seed=NA) {
+  tau = 0.5
+  if (!is.na(seed)) set.seed(seed)
+  x = seq(1/n, 1,length.out = n)
+  if (q==0){
+    y0 = 0*x; y0[x>tau] = 1
+  }
+  if (q==1) {
+    y0 = 2*(tau-x); y0[x>tau] = 2*(x[x>tau]-tau)
+  }
+  y = y0 + sigma*rnorm(n)
+  return(list(y = y, x = x, y0 = y0, tau = tau))  
+}
+
+# -----------------------------------
+# Simu Example: Piecewise Constant/Linear Simulation 
+#     Equal-spaced knots or Random Knots
+# -----------------------------------
+SimuEx <- function(n, sigma=0.1, q=0, nknot=4, seed=NA, RandKnot=FALSE, AdaKnot=FALSE) {
+  if (!is.na(seed)) set.seed(seed)
+  x = seq(1/n, 1,length.out = n)
+  A=round(seq(0, n, length.out=nknot+2))[seq(2,nknot+1)]
+  if(RandKnot) A = sort(sample(seq(6, n-5, 5), nknot))
+  if(AdaKnot) A = round(seq(1, sqrt(n), length.out=nknot+2)^2)[seq(2,nknot+1)]
+  tau = x[A]
+  tau1 = c(0, tau, 1)
+  if (q==0){
+    aa = 1-seq(1,nknot+1)%%2
+    y0 = 0*x
+    for (j in 1:(nknot+1)) y0[x>tau1[j] & x<=tau1[j+1]] = aa[j]
+  }
+  if (q==1) {
+    aa = 2*(-1)^seq(1,nknot+1)
+    phi = rep(1, n)
+    for (j in 1:(nknot+1)) phi = cbind(phi,pmin(pmax(x-tau1[j], 0), tau1[j+1]-tau1[j]))
+    y0 = phi%*%c(0.5+1/(nknot+1),aa)
+  }
+  y = y0 + sigma*rnorm(n)
+  return(list(y = y, x = x, y0 = y0, tau = tau, SetA = A))  
+}
+
+```
+
+# Figure B.1: Scatterplots of runtime versus sample size $n$
+
+
+```{r, eval=FALSE}
+nlist <- seq(100, 3000, 50)
+runtime <- array(0, c(length( nlist),100, 2))
+
+for(i in seq_along(nlist)){
+  n <- nlist[i]
+  for(seed in 1:100){
+
+    # Piecewise constant case
+    # Toy Piecewise constant/linear: one knot only
+    q=0; sigma=0.1; nknot=1
+    data = ToyEx(n=n, q=q, sigma=sigma, seed=seed)
+    start_time <- Sys.time()
+    amias(data$y, D_type="tf0", k=nknot)
+    end_time <- Sys.time()
+    runtime[i, seed, 1] <- end_time - start_time
+
+    q=1; sigma=0.1;  nknot=1
+    data = ToyEx(n=n, q=q, sigma=sigma, seed=seed)
+    start_time <- Sys.time()
+    amias(data$y, D_type="tfq", q=q, k=nknot)
+    end_time <- Sys.time()
+    runtime[i, seed, 2] <- end_time - start_time
+
+  }
+}
+save.image("runtime_amias.RData")
+
+```
+
+
+```{r}
+########################
+## Runtime in amias
+load("runtime_amias.RData")
+
+t1 <- as.numeric(t(runtime[,,1]))
+data <- cbind(rep(nlist, each=100), t1)
+data <- as.data.frame(data)
+colnames(data) <- c("n", "time")
+library(ggplot2)
+p1 <- ggplot(data = data, aes( x= n, y= time)) + geom_jitter(height = 0.0001, width=0) + 
+  # geom_smooth(method = "lm", formula = y ~ x + I(x^2), se= FALSE, size=2, color = "deepskyblue") +
+  ggtitle("Example 1: Piecewise Constant") +
+  labs(x="n", y = "Time (in seconds)") + 
+  theme(axis.text.x = element_text(size = 10,color="black"),
+        axis.title.x = element_text(size = 10,color="black"),
+        axis.text.y = element_text(size = 10,color="black"),
+        axis.title.y = element_text(size = 10,color="black"),
+        plot.title = element_text(size = 10, hjust = 0.5))
+
+
+t1 <- as.numeric(t(runtime[,,2]))
+t1[which.max(t1)] <- NA
+data <- cbind(rep(nlist, each=100), t1)
+data <- as.data.frame(data)
+colnames(data) <- c("n", "time")
+library(ggplot2)
+p2 <- ggplot(data = data, aes( x= n, y= time)) + geom_jitter(height = 0.0001, width=0) + 
+  # geom_smooth(method=lm, se= FALSE, size=2, color = "deepskyblue") +
+  ggtitle("Example 2: Piecewise Linear") + 
+  labs(x="n", y = "Time (in seconds)") + 
+  theme(axis.text.x = element_text(size = 10,color="black"),
+        axis.title.x = element_text(size = 10,color="black"),
+        axis.text.y = element_text(size = 10,color="black"),
+        axis.title.y = element_text(size = 10,color="black"),
+        plot.title = element_text(size = 10, hjust = 0.5))
+
+# png("figs/amias_time_n.png", pointsize=6, width=850, height=400, res=120)
+grid.arrange(p1, p2, ncol=2)
+# dev.off()
+```
+
+# Figure B.2: Jitter plots of MSE versus sample size $N$ in Example 1 and Example 2
+
+
+```{r, eval=FALSE}
+nlist <- seq(100, 1000, 100)
+mse <- array(0, c(length(nlist),100, 4))
+
+for(i in seq_along(nlist)){
+  n <- nlist[i]
+  print(n)
+  for(seed in 1:100){
+    # Piecewise constant case
+    sigma=0.1; q=0; nknot = 1
+    data = ToyEx(n=n, q=q, sigma=sigma, seed=seed)
+
+    op <- par(mfrow=c(1,4))
+    resL0 <- amias(data$y, D_type="tf0", k=nknot)
+    mse[i,seed,1] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+
+    resL0 <- amias(data$y, D_type="tf0", k=nknot, A = sample(n-q-1, nknot))
+    mse[i,seed,2] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+    par(op)
+
+    sigma=0.1; q=1; nknot = 1
+    data = ToyEx(n=n, q=q, sigma=sigma, seed=seed)
+
+    resL0 <- amias(data$y, D_type="tfq", q=q, k=nknot)
+    mse[i,seed,3] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+
+    resL0 <- amias(data$y, D_type="tfq", q=q,  k=nknot, A = sample(n-q-1, nknot))
+    mse[i,seed,4] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+
+
+  }
+}
+save.image("amias_mse_n_single.RData")
+```
+
+
+```{r}
+load("amias_mse_n_single.RData")
+
+title <- c("Example 1: Piecewise Constant","Example 1: Piecewise Constant",  "Example 2: Piecewise Linear", "Example 2: Piecewise Linear")
+p <- list()
+for(j in 1:4){
+  t1 <- as.numeric(t(mse[,,j]))
+  data <- cbind(rep(nlist, each=100), t1)
+  data <- as.data.frame(data)
+  colnames(data) <- c("n", "time")
+  library(ggplot2)
+  p[[j]] <- ggplot(data = data, aes( x= n, y= time)) + geom_jitter()+ 
+    ggtitle(title[j]) + 
+    labs(x="n", y = "MSE") + 
+    theme(axis.text.x = element_text(size = 10,color="black"),
+          axis.title.x = element_text(size = 10,color="black"),
+          axis.text.y = element_text(size = 10,color="black"),
+          axis.title.y = element_text(size = 10,color="black"),
+          plot.title = element_text(size = 10, hjust = 0.5))
+}
+
+# png("figs/amias_mse_n_1.png", pointsize=6, width=850, height=400, res=120)
+grid.arrange(p[[1]], p[[3]], ncol=2)
+# dev.off()
+```
+
+
+# Figure B.3: Jitter plotS of MSE versus sample size $n$ for different initialization strategies in Example 3 with  two knots
+
+```{r, eval=FALSE}
+
+nlist <- seq(100, 1000, 100)
+mse <- array(0, c(length(nlist),100, 4))
+
+for(i in seq_along(nlist)){
+  n <- nlist[i]
+  print(n)
+  for(seed in 1:100){
+    # Piecewise constant case
+    sigma=0.1; q=0; nknot=2;
+    data = SimuEx(n=n, sigma=sigma, q=q, nknot=nknot, seed=seed)
+
+    op <- par(mfrow=c(1,4))
+    resL0 <- amias(data$y, D_type="tf0", k=nknot)
+    mse[i,seed,1] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+
+    resL0 <- amias(data$y, D_type="tf0", k=nknot, A = sample(n-q-1, nknot))
+    mse[i,seed,2] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+
+    resL0_1 <- amias(data$y, D_type="tf0", k=1)
+    resL0 <- amias(data$y, D_type="tf0", k=nknot, A = c(resL0_1$A, sample(setdiff(1:(n-q-1), resL0_1$A), 1)))
+    mse[i,seed,3] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+
+    resL0_1 <- amias(data$y, D_type="tf0", k=1)
+    resL0 <- amias(data$y, D_type="tf0", k=nknot, A = c(resL0_1$A, which.max(abs(resL0_1$u))))
+    mse[i,seed,4] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+    par(op)
+
+
+  }
+}
+save.image("amias_mse_n.RData")
+```
+
+
+```{r}
+load("amias_mse_n.RData")
+title <- c("Empty Set Initialization", "Ramdom Set Initialization", "Stepwise Ramdom Set Initialization", "Warm Start Initialization")
+p <- list()
+for(j in 1:4){
+  t1 <- as.numeric(t(mse[,,j]))
+  data <- cbind(rep(nlist, each=100), t1)
+  data <- as.data.frame(data)
+  colnames(data) <- c("n", "time")
+  library(ggplot2)
+  p[[j]] <- ggplot(data = data, aes( x= n, y= time)) + geom_jitter()+ 
+    ggtitle(title[j]) + 
+    labs(x="n", y = "MSE") + 
+    theme(axis.text.x = element_text(size = 10,color="black"),
+          axis.title.x = element_text(size = 10,color="black"),
+          axis.text.y = element_text(size = 10,color="black"),
+          axis.title.y = element_text(size = 10,color="black"),
+          plot.title = element_text(size = 10, hjust = 0.5))
+}
+
+# png("figs/amias_mse_n.png", pointsize=6, width=850, height=800, res=120)
+grid.arrange(p[[1]], p[[2]],p[[3]], p[[4]], ncol=2)
+# dev.off()
+
+```
+
+
+# Figure B.4: Jitter plots of MSE versus sample size $n$ for different initialization strategies in Example 4 with  two knots
+```{r, eval=FALSE}
+nlist <- seq(100, 1000, 100)
+mse <- array(0, c(length(nlist),100, 4))
+
+for(i in seq_along(nlist)){
+  n <- nlist[i]
+  print(n)
+  for(seed in 1:100){
+    # Piecewise constant case
+    sigma=0.1; q=1; nknot=2;
+    data = SimuEx(n=n, sigma=sigma, q=q, nknot=nknot, seed=seed)
+    
+    op <- par(mfrow=c(1,4))
+    resL0 <- amias(data$y, D_type="tfq", q=1, k=nknot)
+    mse[i,seed,1] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+    
+    resL0 <- amias(data$y, D_type="tfq", q=1, k=nknot, A = sample(n-q-1, nknot))
+    mse[i,seed,2] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+    
+    resL0_1 <- amias(data$y, D_type="tfq", q=1, k=1)
+    resL0 <- amias(data$y, D_type="tfq", q=1, k=nknot, A = c(resL0_1$A, sample(setdiff(1:(n-q-1), resL0_1$A), 1)))
+    mse[i,seed,3] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+    
+    resL0_1 <- amias(data$y, D_type="tfq", q=1, k=1)
+    resL0 <- amias(data$y, D_type="tfq", q=1,  k=nknot, A = c(resL0_1$A, which.max(abs(resL0_1$u))))
+    mse[i,seed,4] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+    par(op)
+  }
+}
+
+save.image("amias_mse_n_q=1.RData")
+```
+
+```{r}
+load("amias_mse_n_q=1.RData")
+title <- c("Empty Set Initialization", "Ramdom Set Initialization", "Stepwise Ramdom Set Initialization", "Warm Start Initialization")
+p <- list()
+for(j in 1:4){
+  t1 <- as.numeric(t(mse[,,j]))
+  data <- cbind(rep(nlist, each=100), t1)
+  data <- as.data.frame(data)
+  colnames(data) <- c("n", "time")
+  library(ggplot2)
+  p[[j]] <- ggplot(data = data, aes( x= n, y= time)) + geom_jitter()+ 
+    ggtitle(title[j]) + 
+    labs(x="n", y = "MSE") + 
+    theme(axis.text.x = element_text(size = 10,color="black"),
+          axis.title.x = element_text(size = 10,color="black"),
+          axis.text.y = element_text(size = 10,color="black"),
+          axis.title.y = element_text(size = 10,color="black"),
+          plot.title = element_text(size = 10, hjust = 0.5))
+}
+
+# png("figs/amias_mse_n_q=1.png", pointsize=6, width=850, height=800, res=120)
+grid.arrange(p[[1]], p[[2]],p[[3]], p[[4]], ncol=2)
+# dev.off()
+```
+
+# Figure B.5 Jitter plots of MSE versus sample size $n$ for two stepwise initialization strategies in Example 3 with two knots
+
+```{r, eval=FALSE}
+nlist <- seq(100, 1000, 100)
+mse <- array(0, c(length(nlist),100, 2))
+
+for(i in seq_along(nlist)){
+  n <- nlist[i]
+  print(n)
+  for(seed in 1:100){
+    # Piecewise constant case
+    sigma=0.1; q=0; nknot=2;
+    data = SimuEx(n=n, sigma=sigma, q=q, nknot=nknot, seed=seed)
+    
+    op <- par(mfrow=c(1,2))
+    
+    resL0_1 <- amias(data$y, D_type="tf0", k=1)
+    y <- data$y
+    L <- sum((y-resL0_1$alpha)^2)
+    
+    alpha <- loss <- rep(0, length=n)
+    for(j in 2:(n-1)){
+      if(j<resL0_1$A){
+        alpha[1:j] <- mean(y[1:j])
+        alpha[(j+1):resL0_1$A] <- mean(y[(j+1):resL0_1$A])
+        alpha[(resL0_1$A+1):n] <- mean(y[(resL0_1$A+1):n])
+        n1 <- j
+        n2 <- resL0_1$A - j
+      }else if(j>resL0_1$A){
+        alpha[1:resL0_1$A] <- mean(y[1:resL0_1$A])
+        alpha[(resL0_1$A+1):j] <- mean(y[(resL0_1$A+1):j])
+        alpha[(j+1):n] <- mean(y[(j+1):n])
+        n1 <- j - resL0_1$A
+        n2 <- n-j
+      }
+      loss[j] <- L - sum((y-alpha)^2)
+    }
+    
+    
+    resL0 <- amias(data$y, D_type="tf0", k=nknot, A = c(resL0_1$A, which.max(loss)))
+    mse[i,seed,1] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+    
+    resL0_1 <- amias(data$y, D_type="tf0", k=1)
+    resL0 <- amias(data$y, D_type="tf0", k=nknot, A = c(resL0_1$A, which.max(abs(resL0_1$u))))
+    mse[i,seed,2] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    plot(resL0)
+    par(op)
+  }
+}
+save.image("amias_mse_n_2.RData")
+```
+
+```{r}
+load("amias_mse_n_2.RData")
+title <- c("Stepwise with Optimum", "Warm Start Initialization")
+p <- list()
+for(j in 1:2){
+  t1 <- as.numeric(t(mse[,,j]))
+  data <- cbind(rep(nlist, each=100), t1)
+  data <- as.data.frame(data)
+  colnames(data) <- c("n", "time")
+  library(ggplot2)
+  p[[j]] <- ggplot(data = data, aes( x= n, y= time)) + 
+    geom_point(position = position_jitter(seed = 1))+ 
+    ggtitle(title[j]) + 
+    labs(x="n", y = "MSE") + 
+    theme(axis.text.x = element_text(size = 10,color="black"),
+          axis.title.x = element_text(size = 10,color="black"),
+          axis.text.y = element_text(size = 10,color="black"),
+          axis.title.y = element_text(size = 10,color="black"),
+          plot.title = element_text(size = 10, hjust = 0.5))
+}
+
+# png("figs/amias_mse_n_2.png", pointsize=6, width=850, height=400, res=120)
+grid.arrange(p[[1]], p[[2]], ncol=2)
+# dev.off()
+```
+
+
+# Figure B.6 Jitter plots of MSE versus sample size $n$ for two stepwise initialization strategies in Example 4 with two knots
+
+```{r, eval=FALSE}
+library(segmented)
+nlist <- seq(100, 1000, 100)
+mse <- array(0, c(length(nlist),100, 2))
+
+for(i in seq_along(nlist)){
+  n <- nlist[i]
+  print(n)
+  for(seed in 1:100){
+    # Piecewise constant case
+    sigma=0.1; q=1; nknot=2;
+    data = SimuEx(n=n, sigma=sigma, q=q, nknot=nknot, seed=seed)
+    
+    #op <- par(mfrow=c(1,2))
+    
+    resL0_1 <- amias(data$y, D_type="tfq", q=1, k=1)
+    y <- data$y
+    L <- sum((y-resL0_1$alpha)^2)
+    
+    alpha <- loss <- rep(0, length=n)
+    for(j in 6:(n-5)){
+      if(abs(j-resL0_1$A)>1){
+        x <- 1:n
+        o<-lm(y~x)
+        os<-segmented(o, psi=c(j, resL0_1$A), control = seg.control(it.max=0))
+        alpha <- predict(os)
+        loss[j] <- L - sum((y-alpha)^2)
+      }
+    }
+    
+    resL0 <- amias(data$y, D_type="tfq", q=1, k=nknot, A = c(resL0_1$A, which.max(loss)))
+    mse[i,seed,1] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+    
+    resL0_1 <- amias(data$y, D_type="tfq", q=1, k=1)
+    resL0 <- amias(data$y, D_type="tfq", q=1,  k=nknot, A = c(resL0_1$A, which.max(abs(resL0_1$u))))
+    mse[i,seed,2] <- mean((as.numeric(data$y)-resL0$alpha)^2)
+  }
+}
+
+save.image("amias_mse_n_3.RData")
+```
+
+```{r}
+load("amias_mse_n_3.RData")
+title <- c("Stepwise with Optimum", "Warm Start Initialization")
+p <- list()
+for(j in 1:2){
+  t1 <- as.numeric(t(mse[,,j]))
+  data <- cbind(rep(nlist, each=100), t1)
+  data <- as.data.frame(data)
+  colnames(data) <- c("n", "time")
+  library(ggplot2)
+  p[[j]] <- ggplot(data = data, aes( x= n, y= time)) + 
+    geom_point(position = position_jitter(seed = 1))+ 
+    ggtitle(title[j]) + 
+    labs(x="n", y = "MSE") + 
+    theme(axis.text.x = element_text(size = 10,color="black"),
+          axis.title.x = element_text(size = 10,color="black"),
+          axis.text.y = element_text(size = 10,color="black"),
+          axis.title.y = element_text(size = 10,color="black"),
+          plot.title = element_text(size = 10, hjust = 0.5))
+}
+
+# png("figs/amias_mse_n_3.png", pointsize=6, width=850, height=400, res=120)
+grid.arrange(p[[1]], p[[2]], ncol=2)
+# dev.off()
+```
+
+# Figure B.7: Error bars of the proportion of convergence against the mixing parameter $\rho$
+
+```{r, eval=FALSE}
+source("utils.R")
+source("amiasutils.R")
+# amias rho vs convergence
+c1 <- c2 <- c()
+for(i in 1:100){
+  if (i%%20==0) print(i)
+  data1 = SimuEx(n=100, sigma=0.1, q=0, nknot=1, seed=i)
+  data2 = SimuEx(n=100, sigma=0.1, q=1, nknot=1, seed=i)
+  rho1 <- seq(0,2,0.1)
+  rho2 <- seq(0,data2$n,5)
+
+  r1 <- r2 <- c()
+  for(rho in rho1){
+    res1 = amias_R(y = data1$y, D = DiffMat(data1$n, data1$nknot), A = c(), k = data1$nknot, rho = rho, q = data1$q)
+    if(res1$iter==20){
+      r1 <- c(r1, 0)
+    }else{
+      r1 <- c(r1, 1)
+    }
+  }
+  for(rho in rho2){
+    res2 = amias_R(y = data2$y, D = DiffMat(data2$n, data2$nknot), A = c(), k = data2$nknot, rho = rho, q = data2$q)
+    if(res2$iter==20){
+      r2 <- c(r2, 0)
+    }else{
+      r2 <- c(r2, 1)
+    }
+  }
+  c1 <- rbind(c1, r1)
+  c2 <- rbind(c2, r2)
+}
+save.image("amias_rho_conv.RData")
+```
+```{r}
+load("amias_rho_conv.RData")
+p1 = convsteps(t(c1), rho1, "Example 1: Piecewise Constant", 'rho', 'convergence ratio')
+p2 = convsteps(t(c2), rho2, "Example 2: Piecewise Linear", 'rho', 'convergence ratio') 
+
+# png("figs/amias_rho_conv.png", pointsize=8, width=850, height=400, res=120)
+ggarrange(p1, p2, ncol = 2)
+# dev.off()
+```
+
+
+
+

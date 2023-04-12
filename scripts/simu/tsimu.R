@@ -1,3 +1,12 @@
+if(!require(gurobi)) install.packages('gurobi')
+if(!require(pracma)) install.packages('pracma')
+if(!require(AMIAS)) install.packages('AMIAS')
+if(!require(wbs)) install.packages('wbs')
+if(!require(not)) install.packages('not')
+if(!require(changepoint)) install.packages('changepoint')
+if(!require(freeknotsplines)) install.packages('freeknotsplines')
+if(!require(cpop)) install.packages('cpop')
+
 library(gurobi)
 library(pracma)
 library(AMIAS)
@@ -17,8 +26,8 @@ SimuBlocks <- function (n, sigma = 0.1, seed=NA)
   tau1=c(0,tau,1)
   y0 = 0*x
   for (j in 1:(length(A)+1)) y0[x>tau1[j] & x<=tau1[j+1]] = h[j]
-  y <- y0 + sigma*rnorm(n)
-  # y <- y0 + sigma*rt(n, 4)
+  # y <- y0 + sigma*rnorm(n)
+  y <- y0 + sigma*rt(n, 4)
   return(list(y = y, x = x, y0 = y0, tau = tau, SetA = A))  
 }
 
@@ -111,6 +120,8 @@ SingleRunL0TF <- function(dgm = "Blocks", n=300, sigma=0.1, seed=NA){
   return(metric)
 }
 
+# -----------------------------------
+# Wrapped-up L1TF 
 L1TF <- function(data, n, q, maxdf) {
   resL1  <- trendfilter(pos=data$x, y=data$y, ord=q) 
   idx <- which(resL1$df<=maxdf)
@@ -367,7 +378,6 @@ SingleRunSpline <- function(dgm = "Blocks", n=300, sigma=0.1, seed=NA){
 # -------------------------------------
 # Blocks - Monte Carlo Replicates
 # -------------------------------------
-source("~/RCode/LibAMIAS2.R")
 library(foreach)
 #library(doMC)
 # registerDoMC(cores=10)
@@ -394,7 +404,7 @@ for (n in nn){
     TabLc = foreach(mcseed = 1:iter, .combine = rbind) %dopar%
       SingleRunL0tfcTF(dgm = "Blocks", n=n, sigma=sigma, seed=mcseed)
   }
-
+  
   ResultL0 = rbind(ResultL0, c(n=n, colMeans(TabL0)))
   ResultL1 = rbind(ResultL1, c(n=n, colMeans(TabL1)))
   ResultSp = rbind(ResultSp, c(n=n, colMeans(TabSp)))
@@ -407,7 +417,7 @@ for (n in nn){
     ResultLc = rbind(ResultLc, c(n=n,Inf,Inf,Inf,Inf,Inf,Inf,Inf))
   }
 }
-save(ResultL0, ResultL1, ResultSp, ResultPt, ResultWs, ResultNt, ResultLc, file="Blocks.RData")
+save(ResultL0, ResultL1, ResultSp, ResultPt, ResultWs, ResultNt, ResultLc, file="tBlocks.RData")
 
 
 ResultL0 <- ResultL1 <- ResultSp <- ResultCp <- ResultNt <- ResultLc <- NULL
@@ -427,7 +437,7 @@ for (n in nn){
     TabLc = foreach(mcseed = 1:iter, .combine = rbind) %dopar%
       SingleRunL0tfcTF(dgm = "Wave", n=n, sigma=sigma, seed=mcseed)
   }
-
+  
   ResultL0 = rbind(ResultL0, c(n=n, colMeans(TabL0)))
   ResultL1 = rbind(ResultL1, c(n=n, colMeans(TabL1)))
   ResultSp = rbind(ResultSp, c(n=n, colMeans(TabSp)))
@@ -458,7 +468,7 @@ for (n in nn){
     TabLc = foreach(mcseed = 1:iter, .combine = rbind) %dopar%
       SingleRunL0tfcTF(dgm = "Doppler", n=n, sigma=sigma, seed=mcseed)
   }
-
+  
   ResultL0 = rbind(ResultL0, c(n=n, colMeans(TabL0)))
   ResultL1 = rbind(ResultL1, c(n=n, colMeans(TabL1)))
   ResultSp = rbind(ResultSp, c(n=n, colMeans(TabSp)))
@@ -470,4 +480,4 @@ for (n in nn){
   }
 }
 
-save(ResultL0, ResultL1, ResultSp, ResultNt, ResultLc, file="tDoppler2.RData")
+save(ResultL0, ResultL1, ResultSp, ResultNt, ResultLc, file="tDoppler.RData")

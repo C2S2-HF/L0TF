@@ -1,5 +1,11 @@
+if(!require(gurobi)) install.packages('gurobi')
+if(!require(pracma)) install.packages('pracma')
+
+
 library(gurobi)
 library(pracma)
+
+## Functions used to generate simulated data -----
 SimuBlocks <- function (n, sigma = 0.1, seed=NA) 
 {
   if (!is.na(seed)) set.seed(seed)
@@ -46,7 +52,6 @@ SimuDoppler <- function(n, sigma = 0.1, seed=NA){
 # y0 is the true signal
 # cpts is the estimated change points
 # tcpt is the true change points
-# -------------------------------------
 EvalMetrics <- function(beta, cpts=NULL, y0, tcpt = NULL){
   mse <- mean((beta-y0)^2)
   mad <- mean(abs(beta-y0))
@@ -79,6 +84,7 @@ DiffMat <- function(n, k=1){
   return(D)
 }
 
+# Functions adopted from https://github.com/yshin12/sparseHP ------
 l0tfc <- function(y=y, D_matrix, l0constraint=l0constraint,M=M,l2penalty=l2penalty,...){
   
   n <- length(y)
@@ -144,6 +150,7 @@ BIC_l0tfc <- function(y, D, kmax, q){
   list(knot=knots[[idx]], fit=fine[,idx], bic=bic[idx])
 }
 
+# Main function to perform $\ell$_0 trend filtering using $\ell_0$-MIP algorithm------
 SingleRunL0tfcTF <- function(dgm = "Blocks", n=300, sigma=0.1, seed=NA){
   
   if (dgm=="Blocks"){
@@ -186,15 +193,15 @@ library(doMC)
 registerDoMC(cores=5)
 
 
-#nn=seq(32,256,32); sigma=0.1;
-#ResultLc <- NULL
-#for (n in nn){
-#  cat("\nRunning n =", n)
-#  TabLc = foreach(mcseed = 1:10, .combine = rbind) %dopar%
-#    SingleRunL0tfcTF(dgm = "Blocks", n=n, sigma=sigma, seed=mcseed)
-#  ResultLc = rbind(ResultLc, c(n=n, colMeans(TabLc)))
-#}
-#save(ResultLc, file="lctBlocks.RData")
+nn=seq(32,256,32); sigma=0.1;
+ResultLc <- NULL
+for (n in nn){
+ cat("\nRunning n =", n)
+ TabLc = foreach(mcseed = 1:10, .combine = rbind) %dopar%
+   SingleRunL0tfcTF(dgm = "Blocks", n=n, sigma=sigma, seed=mcseed)
+ ResultLc = rbind(ResultLc, c(n=n, colMeans(TabLc)))
+}
+save(ResultLc, file="lctBlocks.RData")
 
 
 nn=seq(32,128,32); sigma=0.1;
