@@ -66,10 +66,6 @@ The goal of this repository is to share softare and R scripts of our paper *$\el
     install.packages("Your_download_path/AMIAS_1.0.3.tar.gz", repos = NULL)
 
 
-
-## Results
-
-
 ## Support
 
 For support in using the scripts, you can reach the authors by email wench@ustc.edu.cn.
