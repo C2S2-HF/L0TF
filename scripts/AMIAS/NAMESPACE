@@ -1,0 +1,13 @@
+useDynLib("AMIAS")
+importFrom(utils,head,tail,packageDescription)
+importFrom("graphics", "plot.default", "lines.default")
+importFrom("stats","model.matrix")
+
+import("zoo")
+import("limSolve")
+import("Matrix")
+
+S3method(plot, amias)
+S3method(plot, samias)
+
+export(amias, samias, plot.amias, plot.samias, sim.blocks, sim.wave, sim.doppler,my.rollmean, genDtf1d)

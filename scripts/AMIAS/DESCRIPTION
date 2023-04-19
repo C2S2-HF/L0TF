@@ -1,0 +1,14 @@
+Package: AMIAS
+Type: Package
+Title: Alternating Minimization Induced Active Set Algorithms
+Version: 1.0.3
+Date: 2023-04-17
+Author: Canhong Wen, Zelin Hong, Xueqin Wang, Aijun Zhang
+Maintainer: Canhong Wen <wench@ustc.edu.cn>
+Depends: utils,zoo,limSolve,Matrix
+Description: An implementation of alternating minimization induced active set (AMIAS) method for solving the L0 regularized learning problems. It includes a piecewise smooth estimator by minimizing the least squares function with constraints on the number of kink points in the discrete derivatives. It also includes generalized structural sparsity via composite L0 penalty. Both time series and image segmentation can be handled by this package.
+License: LGPL-3
+NeedsCompilation: yes
+Repository: CRAN
+Date/Publication: 2023-04-17 19:26:44 UTC
+Packaged: 2023-04-17 11:18:49 UTC; wench
